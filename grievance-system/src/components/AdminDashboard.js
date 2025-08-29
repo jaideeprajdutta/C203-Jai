@@ -1,668 +1,516 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Container,
   Paper,
   Typography,
-  Grid,
-  Card,
-  CardContent,
-  Button,
-  Box,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TablePagination,
-  Chip,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   TextField,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
-  Tooltip,
-  Avatar,
+  Button,
+  Box,
+  Alert,
+  Card,
+  CardContent,
+  FormControlLabel,
+  Switch,
+  Chip,
+  Grid,
+  IconButton,
   List,
   ListItem,
   ListItemText,
-  ListItemIcon,
-  Divider,
-  Alert,
-  Badge,
+  ListItemSecondaryAction,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  DialogContentText,
 } from '@mui/material';
 import {
-  AdminPanelSettings as AdminIcon,
-  Visibility as ViewIcon,
-  Edit as EditIcon,
-  FilterList as FilterIcon,
-  GetApp as ExportIcon,
-  TrendingUp as TrendingUpIcon,
-  Assignment as AssignmentIcon,
-  CheckCircle as CheckCircleIcon,
-  Schedule as ScheduleIcon,
-  Category as CategoryIcon,
+  Feedback as FeedbackIcon,
+  CloudUpload as UploadIcon,
+  Delete as DeleteIcon,
+  Send as SendIcon,
+  Lock as LockIcon,
   Person as PersonIcon,
-  CalendarToday as CalendarIcon,
-  Comment as CommentIcon,
-  Save as SaveIcon,
-  Close as CloseIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 
-const AdminDashboard = () => {
+const AnonymousFeedback = () => {
   const navigate = useNavigate();
-  const { state, updateGrievanceStatus, addNotification } = useAppContext();
-  const { user, grievances } = state;
+  const { state, submitGrievance, addNotification } = useAppContext();
+  const { categories, user } = state;
 
-  // State management
-  const [filteredGrievances, setFilteredGrievances] = useState([]);
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [filters, setFilters] = useState({
-    status: '',
+  const [formData, setFormData] = useState({
     category: '',
-    dateRange: '',
+    description: '',
+    isAnonymous: true,
+    urgency: 'Medium',
   });
-  const [selectedGrievance, setSelectedGrievance] = useState(null);
-  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
-  const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
-  const [updateData, setUpdateData] = useState({
-    status: '',
-    message: '',
-  });
+  const [attachments, setAttachments] = useState([]);
+  const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [generatedReferenceId, setGeneratedReferenceId] = useState('');
+  const [harassmentDialogOpen, setHarassmentDialogOpen] = useState(false);
 
-  // Check authorization
-  useEffect(() => {
-    if (!user.isAuthenticated || (user.selectedRole?.name !== 'Admin' && user.selectedRole?.name !== 'Grievance Officer')) {
-      navigate('/dashboard');
+  const urgencyLevels = ['Low', 'Medium', 'High', 'Critical'];
+
+  const handleInputChange = (field) => (event) => {
+    const value = field === 'isAnonymous' ? event.target.checked : event.target.value;
+    
+    // Check if harassment category is selected
+    if (field === 'category' && value === 'Harassment/Discrimination') {
+      setHarassmentDialogOpen(true);
     }
-  }, [user, navigate]);
-
-  // Apply filters and update filtered grievances
-  useEffect(() => {
-    let filtered = grievances.filter(grievance => 
-      grievance.institutionId === user.selectedInstitution?.id
-    );
-
-    if (filters.status) {
-      filtered = filtered.filter(g => g.status === filters.status);
+    
+    setFormData(prev => ({
+      ...prev,
+      [field]: value,
+    }));
+    
+    // Clear error for this field
+    if (errors[field]) {
+      setErrors(prev => ({
+        ...prev,
+        [field]: '',
+      }));
     }
-
-    if (filters.category) {
-      filtered = filtered.filter(g => g.category === filters.category);
-    }
-
-    if (filters.dateRange) {
-      const now = new Date();
-      let dateThreshold;
-
-      switch (filters.dateRange) {
-        case 'today':
-          dateThreshold = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          break;
-        case 'week':
-          dateThreshold = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          break;
-        case 'month':
-          dateThreshold = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-          break;
-        default:
-          dateThreshold = null;
-      }
-
-      if (dateThreshold) {
-        filtered = filtered.filter(g => new Date(g.submittedAt) >= dateThreshold);
-      }
-    }
-
-    // Sort by most recent first
-    filtered.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
-
-    setFilteredGrievances(filtered);
-    setPage(0); // Reset to first page when filters change
-  }, [grievances, filters, user.selectedInstitution]);
-
-  // Calculate statistics
-  const stats = {
-    total: filteredGrievances.length,
-    pending: filteredGrievances.filter(g => ['Submitted', 'Under Review'].includes(g.status)).length,
-    inProgress: filteredGrievances.filter(g => g.status === 'In Progress').length,
-    resolved: filteredGrievances.filter(g => g.status === 'Resolved').length,
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Submitted':
-        return 'info';
-      case 'Under Review':
-        return 'warning';
-      case 'In Progress':
-        return 'primary';
-      case 'Resolved':
+  const handleHarassmentDialogClose = () => {
+    setHarassmentDialogOpen(false);
+  };
+
+  const handleFileUpload = (event) => {
+    const files = Array.from(event.target.files);
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    const allowedTypes = ['image/', 'application/pdf', 'text/', 'application/msword', 'application/vnd.openxmlformats-officedocument'];
+
+    const validFiles = files.filter(file => {
+      if (file.size > maxSize) {
+        addNotification({
+          type: 'error',
+          title: 'File Too Large',
+          message: ${file.name} is too large. Maximum size is 5MB.,
+        });
+        return false;
+      }
+
+      const isValidType = allowedTypes.some(type => file.type.startsWith(type));
+      if (!isValidType) {
+        addNotification({
+          type: 'error',
+          title: 'Invalid File Type',
+          message: ${file.name} is not a supported file type.,
+        });
+        return false;
+      }
+
+      return true;
+    });
+
+    setAttachments(prev => [...prev, ...validFiles]);
+  };
+
+  const removeAttachment = (index) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+
+    if (!formData.category) {
+      newErrors.category = 'Please select a category';
+    }
+
+    if (!formData.description.trim()) {
+      newErrors.description = 'Please provide a description';
+    } else if (formData.description.trim().length < 10) {
+      newErrors.description = 'Description must be at least 10 characters';
+    } else if (formData.description.trim().length > 2000) {
+      newErrors.description = 'Description must be less than 2000 characters';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Simulate file upload process
+      const uploadedFiles = attachments.map(file => ({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        url: mock-url/${file.name}, // In real app, this would be the uploaded file URL
+      }));
+
+      const referenceId = GRV${Date.now().toString().slice(-6)};
+      
+      const grievanceData = {
+        ...formData,
+        attachments: uploadedFiles,
+        referenceId,
+        institutionId: user.selectedInstitution?.id || 'anonymous',
+        submitterRole: user.selectedRole?.name || 'Anonymous',
+      };
+
+      submitGrievance(grievanceData);
+      
+      setGeneratedReferenceId(referenceId);
+      setSubmitSuccess(true);
+      
+      // Reset form
+      setFormData({
+        category: '',
+        description: '',
+        isAnonymous: true,
+        urgency: 'Medium',
+      });
+      setAttachments([]);
+      setErrors({});
+
+    } catch (error) {
+      addNotification({
+        type: 'error',
+        title: 'Submission Failed',
+        message: 'There was an error submitting your grievance. Please try again.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const getUrgencyColor = (urgency) => {
+    switch (urgency) {
+      case 'Low':
         return 'success';
+      case 'Medium':
+        return 'warning';
+      case 'High':
+        return 'error';
+      case 'Critical':
+        return 'error';
       default:
         return 'default';
     }
   };
 
-  const handleFilterChange = (field) => (event) => {
-    setFilters(prev => ({
-      ...prev,
-      [field]: event.target.value,
-    }));
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const clearFilters = () => {
-    setFilters({
-      status: '',
-      category: '',
-      dateRange: '',
-    });
-  };
-
-  const handleViewDetails = (grievance) => {
-    setSelectedGrievance(grievance);
-    setDetailDialogOpen(true);
-  };
-
-  const handleUpdateStatus = (grievance) => {
-    setSelectedGrievance(grievance);
-    setUpdateData({
-      status: grievance.status,
-      message: '',
-    });
-    setUpdateDialogOpen(true);
-  };
-
-  const handleSaveUpdate = () => {
-    if (!updateData.status || !updateData.message.trim()) {
-      addNotification({
-        type: 'error',
-        title: 'Validation Error',
-        message: 'Please provide both status and update message.',
-      });
-      return;
-    }
-
-    updateGrievanceStatus(
-      selectedGrievance.id,
-      updateData.status,
-      updateData.message,
-      user.selectedRole?.name || 'Admin'
+  if (submitSuccess) {
+    return (
+      <Container maxWidth="md" sx={{ py: 4 }}>
+        <Card elevation={3} sx={{ textAlign: 'center', p: 4, borderRadius: 3 }}>
+          <FeedbackIcon sx={{ fontSize: 80, color: 'success.main', mb: 2 }} />
+          <Typography variant="h4" color="success.main" gutterBottom>
+            Grievance Submitted Successfully!
+          </Typography>
+          <Typography variant="h6" color="text.secondary" sx={{ mb: 3 }}>
+            Your reference ID is: <strong>{generatedReferenceId}</strong>
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+            Please save this reference ID to track your grievance status.
+            You will receive updates on the progress of your complaint.
+          </Typography>
+          <Box display="flex" gap={2} justifyContent="center" flexWrap="wrap">
+            <Button
+              variant="contained"
+              onClick={() => navigate('/status-tracking')}
+              size="large"
+            >
+              Track Status
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => {
+                setSubmitSuccess(false);
+                setGeneratedReferenceId('');
+              }}
+              size="large"
+            >
+              Submit Another
+            </Button>
+            <Button
+              variant="text"
+              onClick={() => navigate('/dashboard')}
+              size="large"
+            >
+              Go to Dashboard
+            </Button>
+          </Box>
+        </Card>
+      </Container>
     );
-
-    setUpdateDialogOpen(false);
-    setSelectedGrievance(null);
-    setUpdateData({ status: '', message: '' });
-  };
-
-  const handleExport = () => {
-    // Mock export functionality
-    const csvContent = [
-      ['Reference ID', 'Category', 'Status', 'Submitted Date', 'Last Updated'],
-      ...filteredGrievances.map(g => [
-        g.referenceId,
-        g.category,
-        g.status,
-        new Date(g.submittedAt).toLocaleDateString(),
-        new Date(g.lastUpdated).toLocaleDateString(),
-      ])
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `grievances_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
-
-    addNotification({
-      type: 'success',
-      title: 'Export Complete',
-      message: 'Grievances data has been exported successfully.',
-    });
-  };
-
-  const formatDate = (date) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
-  const statusOptions = ['Submitted', 'Under Review', 'In Progress', 'Resolved', 'Rejected'];
-  const categoryOptions = ['Academic Issues', 'Hostel/Accommodation', 'Harassment/Discrimination', 'Fee/Financial Issues', 'Infrastructure Problems', 'Administrative Issues', 'Other'];
-
-  if (!user.isAuthenticated || (user.selectedRole?.name !== 'Admin' && user.selectedRole?.name !== 'Grievance Officer')) {
-    return null;
   }
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      {/* Header */}
-      <Paper elevation={3} sx={{ p: 4, mb: 4, borderRadius: 3 }}>
-        <Box display="flex" alignItems="center" gap={2} mb={3}>
-          <Avatar sx={{ bgcolor: 'primary.main', width: 56, height: 56 }}>
-            <AdminIcon />
-          </Avatar>
-          <Box>
-            <Typography variant="h4" color="primary" gutterBottom>
-              Administrative Dashboard
-            </Typography>
-            <Typography variant="h6" color="text.secondary">
-              Manage grievances for {user.selectedInstitution?.name}
-            </Typography>
-          </Box>
-        </Box>
-      </Paper>
-
-      {/* Statistics Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card elevation={2}>
-            <CardContent>
-              <Box display="flex" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography variant="h4" color="primary">
-                    {stats.total}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Total Grievances
-                  </Typography>
-                </Box>
-                <AssignmentIcon color="primary" sx={{ fontSize: 40 }} />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card elevation={2}>
-            <CardContent>
-              <Box display="flex" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography variant="h4" color="warning.main">
-                    {stats.pending}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Pending Review
-                  </Typography>
-                </Box>
-                <ScheduleIcon color="warning" sx={{ fontSize: 40 }} />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card elevation={2}>
-            <CardContent>
-              <Box display="flex" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography variant="h4" color="primary.main">
-                    {stats.inProgress}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    In Progress
-                  </Typography>
-                </Box>
-                <TrendingUpIcon color="primary" sx={{ fontSize: 40 }} />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card elevation={2}>
-            <CardContent>
-              <Box display="flex" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography variant="h4" color="success.main">
-                    {stats.resolved}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Resolved
-                  </Typography>
-                </Box>
-                <CheckCircleIcon color="success" sx={{ fontSize: 40 }} />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Filters and Actions */}
-      <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
-        <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-          <Typography variant="h5" color="primary">
-            Grievance Management
+    <Container maxWidth="md" sx={{ py: 4 }}>
+      <Paper elevation={3} sx={{ p: 4, borderRadius: 3 }}>
+        <Box textAlign="center" mb={4}>
+          <FeedbackIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
+          <Typography variant="h3" gutterBottom color="primary">
+            Submit Feedback or Grievance
           </Typography>
-          <Button
-            variant="outlined"
-            startIcon={<ExportIcon />}
-            onClick={handleExport}
-          >
-            Export CSV
-          </Button>
+          <Typography variant="h6" color="text.secondary">
+            Your voice matters. Share your concerns and feedback with us.
+          </Typography>
         </Box>
 
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Status</InputLabel>
-              <Select
-                value={filters.status}
-                label="Status"
-                onChange={handleFilterChange('status')}
-              >
-                <MenuItem value="">All Statuses</MenuItem>
-                {statusOptions.map(status => (
-                  <MenuItem key={status} value={status}>{status}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Category</InputLabel>
-              <Select
-                value={filters.category}
-                label="Category"
-                onChange={handleFilterChange('category')}
-              >
-                <MenuItem value="">All Categories</MenuItem>
-                {categoryOptions.map(category => (
-                  <MenuItem key={category} value={category}>{category}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Date Range</InputLabel>
-              <Select
-                value={filters.dateRange}
-                label="Date Range"
-                onChange={handleFilterChange('dateRange')}
-              >
-                <MenuItem value="">All Time</MenuItem>
-                <MenuItem value="today">Today</MenuItem>
-                <MenuItem value="week">Last 7 Days</MenuItem>
-                <MenuItem value="month">Last 30 Days</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Button
-              variant="outlined"
-              onClick={clearFilters}
-              startIcon={<FilterIcon />}
-              fullWidth
-            >
-              Clear Filters
-            </Button>
-          </Grid>
-        </Grid>
-      </Paper>
-
-      {/* Grievances Table */}
-      <Paper elevation={2}>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Reference ID</TableCell>
-                <TableCell>Category</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Submitted</TableCell>
-                <TableCell>Last Updated</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredGrievances
-                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((grievance) => (
-                  <TableRow key={grievance.id} hover>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        {grievance.referenceId}
-                      </Typography>
-                      {grievance.isAnonymous && (
-                        <Chip label="Anonymous" size="small" variant="outlined" sx={{ mt: 0.5 }} />
-                      )}
-                    </TableCell>
-                    <TableCell>{grievance.category}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={grievance.status}
-                        color={getStatusColor(grievance.status)}
-                        size="small"
-                        variant="outlined"
+        <form onSubmit={handleSubmit}>
+          <Grid container spacing={3}>
+            {/* Anonymous Switch */}
+            <Grid item xs={12}>
+              <Card variant="outlined" sx={{ p: 2 }}>
+                <Box display="flex" alignItems="center" justifyContent="space-between">
+                  <Box display="flex" alignItems="center" gap={1}>
+                    {formData.isAnonymous ? <LockIcon color="primary" /> : <PersonIcon color="primary" />}
+                    <Typography variant="h6">
+                      {formData.isAnonymous ? 'Anonymous Submission' : 'Identified Submission'}
+                    </Typography>
+                  </Box>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={formData.isAnonymous}
+                        onChange={handleInputChange('isAnonymous')}
+                        color="primary"
                       />
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {formatDate(grievance.submittedAt)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {formatDate(grievance.lastUpdated)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Box display="flex" gap={1}>
-                        <Tooltip title="View Details">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleViewDetails(grievance)}
-                          >
-                            <ViewIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Update Status">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleUpdateStatus(grievance)}
-                            color="primary"
-                          >
-                            <EditIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25, 50]}
-          component="div"
-          count={filteredGrievances.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={handleChangePage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
-        />
-      </Paper>
-
-      {/* Detail Dialog */}
-      <Dialog
-        open={detailDialogOpen}
-        onClose={() => setDetailDialogOpen(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>
-          Grievance Details - {selectedGrievance?.referenceId}
-        </DialogTitle>
-        <DialogContent>
-          {selectedGrievance && (
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
-                <List>
-                  <ListItem>
-                    <ListItemIcon><CategoryIcon /></ListItemIcon>
-                    <ListItemText
-                      primary="Category"
-                      secondary={selectedGrievance.category}
-                    />
-                  </ListItem>
-                  <ListItem>
-                    <ListItemIcon><CalendarIcon /></ListItemIcon>
-                    <ListItemText
-                      primary="Submitted"
-                      secondary={formatDate(selectedGrievance.submittedAt)}
-                    />
-                  </ListItem>
-                  <ListItem>
-                    <ListItemIcon><PersonIcon /></ListItemIcon>
-                    <ListItemText
-                      primary="Submission Type"
-                      secondary={selectedGrievance.isAnonymous ? 'Anonymous' : 'Identified'}
-                    />
-                  </ListItem>
-                </List>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Box>
-                  <Typography variant="h6" gutterBottom>
-                    Current Status
-                  </Typography>
-                  <Chip
-                    label={selectedGrievance.status}
-                    color={getStatusColor(selectedGrievance.status)}
-                    variant="outlined"
-                    size="medium"
+                    }
+                    label="Submit Anonymously"
                   />
                 </Box>
-              </Grid>
-              <Grid item xs={12}>
-                <Divider />
-                <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
-                  Description
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  {formData.isAnonymous 
+                    ? 'Your identity will be kept completely confidential.' 
+                    : 'We may contact you for additional information.'}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {selectedGrievance.description}
-                </Typography>
-              </Grid>
-              <Grid item xs={12}>
-                <Typography variant="h6" gutterBottom>
-                  Status History
-                </Typography>
-                <List dense>
-                  {selectedGrievance.updates?.map((update) => (
-                    <ListItem key={update.id}>
-                      <ListItemIcon>
-                        <CommentIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={
-                          <Box display="flex" alignItems="center" gap={1}>
-                            <Chip
-                              label={update.status}
-                              size="small"
-                              color={getStatusColor(update.status)}
-                              variant="outlined"
-                            />
-                            <Typography variant="caption">
-                              by {update.updatedBy}
-                            </Typography>
-                          </Box>
-                        }
-                        secondary={
-                          <>
-                            <Typography variant="body2">{update.message}</Typography>
-                            <Typography variant="caption">
-                              {formatDate(update.timestamp)}
-                            </Typography>
-                          </>
-                        }
-                      />
-                    </ListItem>
-                  ))}
-                </List>
-              </Grid>
+              </Card>
             </Grid>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDetailDialogOpen(false)}>Close</Button>
-        </DialogActions>
-      </Dialog>
 
-      {/* Update Status Dialog */}
-      <Dialog
-        open={updateDialogOpen}
-        onClose={() => setUpdateDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>
-          Update Status - {selectedGrievance?.referenceId}
-        </DialogTitle>
-        <DialogContent>
-          <Grid container spacing={3} sx={{ mt: 1 }}>
+            {/* Category Selection - Full Width */}
             <Grid item xs={12}>
-              <FormControl fullWidth>
-                <InputLabel>New Status</InputLabel>
+              <FormControl fullWidth error={!!errors.category}>
+                <InputLabel>Category *</InputLabel>
                 <Select
-                  value={updateData.status}
-                  label="New Status"
-                  onChange={(e) => setUpdateData(prev => ({ ...prev, status: e.target.value }))}
+                  value={formData.category}
+                  label="Category *"
+                  onChange={handleInputChange('category')}
                 >
-                  {statusOptions.map(status => (
-                    <MenuItem key={status} value={status}>{status}</MenuItem>
+                  {categories.map((category) => (
+                    <MenuItem key={category} value={category}>
+                      {category}
+                    </MenuItem>
+                  ))}
+                </Select>
+                {errors.category && (
+                  <Typography variant="caption" color="error" sx={{ mt: 1 }}>
+                    {errors.category}
+                  </Typography>
+                )}
+              </FormControl>
+            </Grid>
+
+            {/* Urgency Level - Moved to new row */}
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth>
+                <InputLabel>Urgency Level</InputLabel>
+                <Select
+                  value={formData.urgency}
+                  label="Urgency Level"
+                  onChange={handleInputChange('urgency')}
+                >
+                  {urgencyLevels.map((level) => (
+                    <MenuItem key={level} value={level}>
+                      <Box display="flex" alignItems="center" gap={1}>
+                        <Chip
+                          size="small"
+                          label={level}
+                          color={getUrgencyColor(level)}
+                          variant="outlined"
+                        />
+                      </Box>
+                    </MenuItem>
                   ))}
                 </Select>
               </FormControl>
             </Grid>
+
+            {/* Description */}
             <Grid item xs={12}>
               <TextField
                 fullWidth
                 multiline
-                rows={4}
-                label="Update Message"
-                placeholder="Provide details about this status update..."
-                value={updateData.message}
-                onChange={(e) => setUpdateData(prev => ({ ...prev, message: e.target.value }))}
-                required
+                rows={6}
+                label="Description *"
+                placeholder="Please provide detailed information about your grievance or feedback..."
+                value={formData.description}
+                onChange={handleInputChange('description')}
+                error={!!errors.description}
+                helperText={
+                  errors.description || 
+                  ${formData.description.length}/2000 characters
+                }
+                inputProps={{ maxLength: 2000 }}
               />
             </Grid>
+
+            {/* File Upload */}
+            <Grid item xs={12}>
+              <Card variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="h6" gutterBottom>
+                  Attachments (Optional)
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Upload supporting documents, images, or files (Max 5MB each)
+                </Typography>
+                
+                <input
+                  accept="image/*,.pdf,.doc,.docx,.txt"
+                  style={{ display: 'none' }}
+                  id="file-upload"
+                  multiple
+                  type="file"
+                  onChange={handleFileUpload}
+                />
+                <label htmlFor="file-upload">
+                  <Button
+                    variant="outlined"
+                    component="span"
+                    startIcon={<UploadIcon />}
+                    sx={{ mb: 2 }}
+                  >
+                    Upload Files
+                  </Button>
+                </label>
+
+                {attachments.length > 0 && (
+                  <List dense>
+                    {attachments.map((file, index) => (
+                      <ListItem key={index} divider>
+                        <ListItemText
+                          primary={file.name}
+                          secondary={${formatFileSize(file.size)} • ${file.type}}
+                        />
+                        <ListItemSecondaryAction>
+                          <IconButton
+                            edge="end"
+                            aria-label="delete"
+                            onClick={() => removeAttachment(index)}
+                            size="small"
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </ListItemSecondaryAction>
+                      </ListItem>
+                    ))}
+                  </List>
+                )}
+              </Card>
+            </Grid>
+
+            {/* Information Alert */}
+            <Grid item xs={12}>
+              <Alert severity="info">
+                <Typography variant="body2">
+                  <strong>Important:</strong> Your grievance will be reviewed by the appropriate department. 
+                  You will receive a reference ID to track the status of your submission. 
+                  Please keep this reference ID safe for future communication.
+                </Typography>
+              </Alert>
+            </Grid>
+
+            {/* Submit Button */}
+            <Grid item xs={12}>
+              <Box display="flex" justifyContent="center" gap={2}>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  size="large"
+                  disabled={isSubmitting}
+                  startIcon={<SendIcon />}
+                  sx={{ minWidth: 200 }}
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit Grievance'}
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="large"
+                  onClick={() => navigate('/dashboard')}
+                >
+                  Cancel
+                </Button>
+              </Box>
+            </Grid>
           </Grid>
+        </form>
+      </Paper>
+
+      {/* Harassment Alert Dialog */}
+      <Dialog
+        open={harassmentDialogOpen}
+        onClose={handleHarassmentDialogClose}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ color: 'error.main', fontWeight: 'bold' }}>
+          ⚠ Harassment Report - Important Information
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            <strong>You have selected "Harassment" as your grievance category.</strong>
+          </DialogContentText>
+          <DialogContentText sx={{ mb: 2 }}>
+            We take harassment reports very seriously. Please be aware that:
+          </DialogContentText>
+          <Box component="ul" sx={{ pl: 2, mb: 2 }}>
+            <li>Your report will be handled with utmost confidentiality</li>
+            <li>We have a zero-tolerance policy for harassment</li>
+            <li>You may be contacted for additional information if needed</li>
+            <li>Support resources are available if you need immediate assistance</li>
+            <li>False accusations can have serious consequences</li>
+          </Box>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <Typography variant="body2">
+              <strong>Emergency:</strong> If you are in immediate danger, please contact local emergency services (911) or campus security immediately.
+            </Typography>
+          </Alert>
+          <Alert severity="info">
+            <Typography variant="body2">
+              <strong>Support Resources:</strong> Counseling services and support groups are available. Contact the Student Support Center for assistance.
+            </Typography>
+          </Alert>
         </DialogContent>
         <DialogActions>
-          <Button
-            onClick={() => setUpdateDialogOpen(false)}
-            startIcon={<CloseIcon />}
-          >
-            Cancel
+          <Button onClick={handleHarassmentDialogClose} color="primary" variant="contained">
+            I Understand, Continue
           </Button>
-          <Button
-            onClick={handleSaveUpdate}
-            variant="contained"
-            startIcon={<SaveIcon />}
+          <Button 
+            onClick={() => {
+              setFormData(prev => ({ ...prev, category: '' }));
+              handleHarassmentDialogClose();
+            }} 
+            color="secondary"
           >
-            Update Status
+            Cancel Selection
           </Button>
         </DialogActions>
       </Dialog>
@@ -670,4 +518,4 @@ const AdminDashboard = () => {
   );
 };
 
-export default AdminDashboard;
+export default AnonymousFeedback;

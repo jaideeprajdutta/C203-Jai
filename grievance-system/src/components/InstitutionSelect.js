@@ -1,28 +1,11 @@
 import React, { useState } from 'react';
-import {
-  Container,
-  Paper,
-  Typography,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Button,
-  Box,
-  Stepper,
-  Step,
-  StepLabel,
-  Alert,
-  Card,
-  CardContent,
-  Grid,
-} from '@mui/material';
-import {
-  School as SchoolIcon,
-  NavigateNext as NextIcon,
-} from '@mui/icons-material';
+import { GraduationCap, ChevronRight, Shield, BarChart3, MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
+import { Button } from './ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Label } from './ui/label';
 
 const InstitutionSelect = () => {
   const navigate = useNavigate();
@@ -34,10 +17,7 @@ const InstitutionSelect = () => {
 
   const steps = ['Select Institution', 'Select Role', 'Dashboard'];
 
-  const handleInstitutionChange = (event) => {
-    setSelectedInstitutionId(event.target.value);
-    setError(''); // Clear any previous errors
-  };
+
 
   const handleNext = () => {
     if (!selectedInstitutionId) {
@@ -51,135 +31,141 @@ const InstitutionSelect = () => {
   };
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
+    <div className="container mx-auto py-8 px-4 max-w-4xl">
       {/* Stepper */}
-      <Box sx={{ mb: 4 }}>
-        <Stepper activeStep={0} alternativeLabel>
-          {steps.map((label) => (
-            <Step key={label}>
-              <StepLabel>{label}</StepLabel>
-            </Step>
+      <div className="mb-8">
+        <div className="flex items-center justify-between">
+          {steps.map((step, index) => (
+            <div key={step} className="flex items-center">
+              <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
+                index === 0 ? 'bg-black text-white border-black' : 'border-[#A2D5C6] text-[#A2D5C6]'
+              }`}>
+                {index + 1}
+              </div>
+              <span className={`ml-2 text-sm font-medium ${
+                index === 0 ? 'text-foreground' : 'text-muted-foreground'
+              }`}>
+                {step}
+              </span>
+              {index < steps.length - 1 && (
+                <div className={`w-16 h-0.5 mx-4 ${
+                  index === 0 ? 'bg-muted' : 'bg-muted'
+                }`} />
+              )}
+            </div>
           ))}
-        </Stepper>
-      </Box>
+        </div>
+      </div>
 
       {/* Main Content */}
-      <Paper elevation={3} sx={{ p: 4, borderRadius: 3 }}>
-        <Box textAlign="center" mb={4}>
-          <SchoolIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
-          <Typography variant="h3" gutterBottom color="primary">
-            Welcome to Grievance Redressal System
-          </Typography>
-          <Typography variant="h6" color="text.secondary" sx={{ maxWidth: 600, mx: 'auto' }}>
-            A secure platform for submitting feedback, tracking complaints, and ensuring
-            your voice is heard. Please select your institution to begin.
-          </Typography>
-        </Box>
+      <Card className="mb-6">
+        <CardContent className="p-8">
+          <div className="text-center mb-8">
+            <GraduationCap className="h-15 w-15 text-black mx-auto mb-4" size={60} />
+            <h1 className="text-4xl font-bold text-black mb-4">
+              Welcome to Grievance Redressal System
+            </h1>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              A secure platform for submitting feedback, tracking complaints, and ensuring
+              your voice is heard. Please select your institution to begin.
+            </p>
+          </div>
 
-        {/* Institution Selection */}
-        <Card elevation={1} sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography variant="h5" gutterBottom color="primary">
-              Step 1: Select Your Institution
-            </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-              Choose your educational institution from the list below to access the grievance system.
-            </Typography>
+          {/* Institution Selection */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="text-black">Step 1: Select Your Institution</CardTitle>
+              <CardDescription>
+                Choose your educational institution from the list below to access the grievance system.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="institution-select">Institution</Label>
+                <Select value={selectedInstitutionId} onValueChange={(value) => {
+                  setSelectedInstitutionId(value);
+                  setError('');
+                }}>
+                  <SelectTrigger id="institution-select">
+                    <SelectValue placeholder="Please select an institution" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {institutions.map((institution) => (
+                      <SelectItem key={institution.id} value={institution.id}>
+                        <div>
+                          <div className="font-medium">{institution.name}</div>
+                          <div className="text-sm text-muted-foreground">{institution.type}</div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <FormControl fullWidth sx={{ mb: 3 }}>
-              <InputLabel id="institution-select-label">Institution</InputLabel>
-              <Select
-                labelId="institution-select-label"
-                id="institution-select"
-                value={selectedInstitutionId}
-                label="Institution"
-                onChange={handleInstitutionChange}
-                error={!!error}
-              >
-                <MenuItem value="">
-                  <em>Please select an institution</em>
-                </MenuItem>
-                {institutions.map((institution) => (
-                  <MenuItem key={institution.id} value={institution.id}>
-                    <Box>
-                      <Typography variant="body1">{institution.name}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {institution.type}
-                      </Typography>
-                    </Box>
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+              {error && (
+                <div className="bg-destructive/15 border border-destructive/20 text-destructive px-4 py-3 rounded-md">
+                  {error}
+                </div>
+              )}
 
-            {error && (
-              <Alert severity="error" sx={{ mb: 3 }}>
-                {error}
-              </Alert>
-            )}
+              <div className="flex justify-between items-center pt-4">
+                <p className="text-sm text-muted-foreground">
+                  Don't see your institution? Contact your system administrator.
+                </p>
+                <Button
+                  onClick={handleNext}
+                  disabled={!selectedInstitutionId}
+                  className="gap-2"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
-            <Box display="flex" justifyContent="space-between" alignItems="center">
-              <Typography variant="body2" color="text.secondary">
-                Don't see your institution? Contact your system administrator.
-              </Typography>
-              <Button
-                variant="contained"
-                endIcon={<NextIcon />}
-                onClick={handleNext}
-                size="large"
-                disabled={!selectedInstitutionId}
-                sx={{ minWidth: 120 }}
-              >
-                Next
-              </Button>
-            </Box>
-          </CardContent>
-        </Card>
-
-        {/* Information Cards */}
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={4}>
-            <Card elevation={1} sx={{ height: '100%' }}>
-              <CardContent>
-                <Typography variant="h6" color="primary" gutterBottom>
-                  🔒 Secure & Anonymous
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
+          {/* Information Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3 mb-3">
+                  <Shield className="h-6 w-6 text-black" />
+                  <h3 className="font-semibold text-black">Secure & Anonymous</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">
                   Your privacy is protected. Submit feedback anonymously or with your identity
                   as preferred.
-                </Typography>
+                </p>
               </CardContent>
             </Card>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Card elevation={1} sx={{ height: '100%' }}>
-              <CardContent>
-                <Typography variant="h6" color="primary" gutterBottom>
-                  📊 Track Progress
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3 mb-3">
+                  <BarChart3 className="h-6 w-6 text-black" />
+                  <h3 className="font-semibold text-black">Track Progress</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">
                   Monitor the status of your complaints and grievances with real-time updates
                   and notifications.
-                </Typography>
+                </p>
               </CardContent>
             </Card>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Card elevation={1} sx={{ height: '100%' }}>
-              <CardContent>
-                <Typography variant="h6" color="primary" gutterBottom>
-                  💬 Get Help
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3 mb-3">
+                  <MessageCircle className="h-6 w-6 text-black" />
+                  <h3 className="font-semibold text-black">Get Help</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">
                   Access our intelligent chatbot for instant help with frequently asked
                   questions and guidance.
-                </Typography>
+                </p>
               </CardContent>
             </Card>
-          </Grid>
-        </Grid>
-      </Paper>
-    </Container>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

@@ -22,6 +22,11 @@ import {
   ListItem,
   ListItemText,
   ListItemSecondaryAction,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  DialogContentText,
 } from '@mui/material';
 import {
   Feedback as FeedbackIcon,
@@ -50,11 +55,19 @@ const AnonymousFeedback = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [generatedReferenceId, setGeneratedReferenceId] = useState('');
+  const [harassmentDialogOpen, setHarassmentDialogOpen] = useState(false);
 
   const urgencyLevels = ['Low', 'Medium', 'High', 'Critical'];
 
   const handleInputChange = (field) => (event) => {
     const value = field === 'isAnonymous' ? event.target.checked : event.target.value;
+    
+    // Check if harassment category is selected
+    if (field === 'category' && value === 'Harassment/Discrimination') {
+      setHarassmentDialogOpen(true);
+      alert("be careful");
+    }
+    
     setFormData(prev => ({
       ...prev,
       [field]: value,
@@ -69,6 +82,10 @@ const AnonymousFeedback = () => {
     }
   };
 
+  const handleHarassmentDialogClose = () => {
+    setHarassmentDialogOpen(false);
+  };
+
   const handleFileUpload = (event) => {
     const files = Array.from(event.target.files);
     const maxSize = 5 * 1024 * 1024; // 5MB
@@ -79,7 +96,7 @@ const AnonymousFeedback = () => {
         addNotification({
           type: 'error',
           title: 'File Too Large',
-          message: `${file.name} is too large. Maximum size is 5MB.`,
+          message: ${file.name} is too large. Maximum size is 5MB.,
         });
         return false;
       }
@@ -89,7 +106,7 @@ const AnonymousFeedback = () => {
         addNotification({
           type: 'error',
           title: 'Invalid File Type',
-          message: `${file.name} is not a supported file type.`,
+          message: ${file.name} is not a supported file type.,
         });
         return false;
       }
@@ -138,10 +155,10 @@ const AnonymousFeedback = () => {
         name: file.name,
         size: file.size,
         type: file.type,
-        url: `mock-url/${file.name}`, // In real app, this would be the uploaded file URL
+        url: mock-url/${file.name}, // In real app, this would be the uploaded file URL
       }));
 
-      const referenceId = `GRV${Date.now().toString().slice(-6)}`;
+      const referenceId = GRV${Date.now().toString().slice(-6)};
       
       const grievanceData = {
         ...formData,
@@ -290,8 +307,8 @@ const AnonymousFeedback = () => {
               </Card>
             </Grid>
 
-            {/* Category Selection */}
-            <Grid item xs={12} md={6}>
+            {/* Category Selection - Full Width */}
+            <Grid item xs={12}>
               <FormControl fullWidth error={!!errors.category}>
                 <InputLabel>Category *</InputLabel>
                 <Select
@@ -313,7 +330,7 @@ const AnonymousFeedback = () => {
               </FormControl>
             </Grid>
 
-            {/* Urgency Level */}
+            {/* Urgency Level - Moved to new row */}
             <Grid item xs={12} md={6}>
               <FormControl fullWidth>
                 <InputLabel>Urgency Level</InputLabel>
@@ -351,7 +368,7 @@ const AnonymousFeedback = () => {
                 error={!!errors.description}
                 helperText={
                   errors.description || 
-                  `${formData.description.length}/2000 characters`
+                  ${formData.description.length}/2000 characters
                 }
                 inputProps={{ maxLength: 2000 }}
               />
@@ -392,7 +409,7 @@ const AnonymousFeedback = () => {
                       <ListItem key={index} divider>
                         <ListItemText
                           primary={file.name}
-                          secondary={`${formatFileSize(file.size)} • ${file.type}`}
+                          secondary={${formatFileSize(file.size)} • ${file.type}}
                         />
                         <ListItemSecondaryAction>
                           <IconButton
@@ -447,6 +464,57 @@ const AnonymousFeedback = () => {
           </Grid>
         </form>
       </Paper>
+
+      {/* Harassment Alert Dialog */}
+      <Dialog
+        open={harassmentDialogOpen}
+        onClose={handleHarassmentDialogClose}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ color: 'error.main', fontWeight: 'bold' }}>
+          ⚠ Harassment Report - Important Information
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            <strong>You have selected "Harassment" as your grievance category.</strong>
+          </DialogContentText>
+          <DialogContentText sx={{ mb: 2 }}>
+            We take harassment reports very seriously. Please be aware that:
+          </DialogContentText>
+          <Box component="ul" sx={{ pl: 2, mb: 2 }}>
+            <li>Your report will be handled with utmost confidentiality</li>
+            <li>We have a zero-tolerance policy for harassment</li>
+            <li>You may be contacted for additional information if needed</li>
+            <li>Support resources are available if you need immediate assistance</li>
+            <li>False accusations can have serious consequences</li>
+          </Box>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <Typography variant="body2">
+              <strong>Emergency:</strong> If you are in immediate danger, please contact local emergency services (911) or campus security immediately.
+            </Typography>
+          </Alert>
+          <Alert severity="info">
+            <Typography variant="body2">
+              <strong>Support Resources:</strong> Counseling services and support groups are available. Contact the Student Support Center for assistance.
+            </Typography>
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleHarassmentDialogClose} color="primary" variant="contained">
+            I Understand, Continue
+          </Button>
+          <Button 
+            onClick={() => {
+              setFormData(prev => ({ ...prev, category: '' }));
+              handleHarassmentDialogClose();
+            }} 
+            color="secondary"
+          >
+            Cancel Selection
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

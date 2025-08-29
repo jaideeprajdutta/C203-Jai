@@ -196,6 +196,12 @@ export const AppContextProvider = ({ children }) => {
 
   const selectRole = (role) => {
     dispatch({ type: actionTypes.SELECT_ROLE, payload: role });
+    dispatch({ type: actionTypes.LOGIN_USER }); // Automatically authenticate user after role selection
+    
+    // Load mock grievances for demonstration
+    setTimeout(() => {
+      loadMockGrievances(state.user.selectedInstitution?.id);
+    }, 500);
   };
 
   const loginUser = () => {
@@ -243,7 +249,9 @@ export const AppContextProvider = ({ children }) => {
     dispatch({ type: actionTypes.TOGGLE_CHATBOT });
   };
 
-  const loadMockGrievances = () => {
+  const loadMockGrievances = (institutionId = null) => {
+    const targetInstitutionId = institutionId || state.user.selectedInstitution?.id;
+    
     const mockGrievances = [
       {
         id: uuidv4(),
@@ -251,10 +259,11 @@ export const AppContextProvider = ({ children }) => {
         category: 'Academic Issues',
         description: 'Issues with course registration system not working properly',
         status: 'In Progress',
+        priority: 'High',
         submittedAt: new Date(Date.now() - 86400000 * 2), // 2 days ago
-        lastUpdated: new Date(Date.now() - 86400000), // 1 day ago
+        updatedAt: new Date(Date.now() - 86400000), // 1 day ago
         isAnonymous: true,
-        institutionId: state.user.selectedInstitution?.id,
+        institutionId: targetInstitutionId,
         updates: [
           {
             id: uuidv4(),
@@ -285,10 +294,11 @@ export const AppContextProvider = ({ children }) => {
         category: 'Infrastructure Problems',
         description: 'Library air conditioning not working properly, making it difficult to study',
         status: 'Resolved',
+        priority: 'Medium',
         submittedAt: new Date(Date.now() - 86400000 * 5),
-        lastUpdated: new Date(Date.now() - 86400000 * 0.5),
+        updatedAt: new Date(Date.now() - 86400000 * 0.5),
         isAnonymous: false,
-        institutionId: state.user.selectedInstitution?.id,
+        institutionId: targetInstitutionId,
         updates: [
           {
             id: uuidv4(),
@@ -317,6 +327,27 @@ export const AppContextProvider = ({ children }) => {
             message: 'AC system has been repaired and is now working properly.',
             timestamp: new Date(Date.now() - 86400000 * 0.5),
             updatedBy: 'Facilities Manager',
+          },
+        ],
+      },
+      {
+        id: uuidv4(),
+        referenceId: 'GRV001236',
+        category: 'Administrative Issues',
+        description: 'Difficulty getting transcript copies from the registrar office',
+        status: 'Submitted',
+        priority: 'Low',
+        submittedAt: new Date(Date.now() - 86400000 * 1),
+        updatedAt: new Date(Date.now() - 86400000 * 1),
+        isAnonymous: false,
+        institutionId: targetInstitutionId,
+        updates: [
+          {
+            id: uuidv4(),
+            status: 'Submitted',
+            message: 'Your grievance has been submitted successfully.',
+            timestamp: new Date(Date.now() - 86400000 * 1),
+            updatedBy: 'System',
           },
         ],
       },
